@@ -10,7 +10,6 @@ require (
 	github.com/nats-io/nats.go v1.37.0
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/robinbraemer/event v0.1.1
-	go.minekube.com/brigodier v0.0.1
 	go.minekube.com/common v0.0.6
 	go.minekube.com/gate v0.47.0
 )
@@ -59,6 +58,7 @@ require (
 	github.com/urfave/cli/v2 v2.27.5 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect
+	go.minekube.com/brigodier v0.0.1 // indirect
 	go.minekube.com/connect v0.6.2 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
