@@ -3,14 +3,15 @@ package cynder
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/CytonicMC/Cynder/cynder/messaging"
 	"github.com/CytonicMC/Cynder/cynder/natsMsgr"
 	"github.com/CytonicMC/Cynder/cynder/natsMsgr/players"
 	"github.com/CytonicMC/Cynder/cynder/natsMsgr/servers"
+	"github.com/CytonicMC/Cynder/cynder/util/mini"
 	"github.com/go-logr/logr"
 	"github.com/nats-io/nats.go"
 	"github.com/robinbraemer/event"
+	"go.minekube.com/common/minecraft/component"
 	"go.minekube.com/gate/pkg/edition/java/proxy"
 )
 
@@ -77,12 +78,16 @@ type Cynder struct {
 	dependencies *Dependencies
 }
 
+// when joining for the first time, the player is always sent to a lobby
 func registerEvents(p *proxy.Proxy, nc messaging.NatsService, logger logr.Logger) {
 	event.Subscribe(p.Event(), 0, func(e *proxy.PlayerChooseInitialServerEvent) {
-		//todo: grouping fallbacks, etc
-		logger.Info("<< - CHOOSE INITIAL SERVER - >>")
-		server := servers.GetLeastLoadedServer("GROUP_HERE")
-		fmt.Printf("Server: %v", server)
+		server := servers.GetLeastLoadedServer("cytonic", "lobby")
+		//server := servers.GetLeastLoadedServer("gilded_gorge", "hub")
+
+		if server == nil {
+			e.Player().Disconnect(mini.Parse("<color:red><bold>WHOOPS!</bold></color:red><color:gray> There are no lobby servers to connect to right now. Try again later!"))
+			return
+		}
 		e.SetInitialServer(server)
 	})
 
@@ -120,5 +125,24 @@ func registerEvents(p *proxy.Proxy, nc messaging.NatsService, logger logr.Logger
 			logger.Error(err, "Failed broadcast player server change!")
 			return
 		}
+	})
+
+	event.Subscribe(p.Event(), 0, func(e *proxy.KickedFromServerEvent) {
+
+		server, success := servers.GetFallbackFromServer(e.Server())
+
+		if !success {
+			msg := mini.Parse("<color:red>Failed to rescue from internal disconnect. Inital kick reason: ")
+			msg.SetChildren([]component.Component{e.OriginalReason()})
+			e.SetResult(&proxy.DisconnectPlayerKickResult{
+				Reason: msg,
+			})
+			return
+		}
+
+		e.SetResult(&proxy.RedirectPlayerKickResult{
+			Server:  server,
+			Message: mini.Parse("<color:gold><bold>YOINK!</bold></color:gold><color:gray> A kick occured in your connection, so you were placed in a lobby!"),
+		})
 	})
 }
