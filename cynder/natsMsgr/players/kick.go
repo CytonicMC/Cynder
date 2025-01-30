@@ -12,7 +12,7 @@ import (
 	"go.minekube.com/gate/pkg/util/uuid"
 )
 
-func HandlePlayerKick(nc messaging.NatsService, proxy *proxy.Proxy, ctx context.Context) {
+func HandlePlayerKick(nc messaging.NatsService, proxyInstance *proxy.Proxy, ctx context.Context) {
 	const subject = "players.kick"
 	err := nc.Subscribe(subject, func(msg *nats.Msg) {
 		data := string(msg.Data)
@@ -22,10 +22,10 @@ func HandlePlayerKick(nc messaging.NatsService, proxy *proxy.Proxy, ctx context.
 			return
 		}
 		parsedUuid, _ := uuid.Parse(packet.UUID)
-		player := proxy.Player(parsedUuid)
+		player := proxyInstance.Player(parsedUuid)
 
 		if player == nil {
-			// player not on this proxy
+			// player not on this proxyInstance
 			return
 		}
 
@@ -37,8 +37,25 @@ func HandlePlayerKick(nc messaging.NatsService, proxy *proxy.Proxy, ctx context.
 
 		if packet.Reason.Rescuable {
 			// rescue the player
-			//todo: chage this to automatically go down a layer
-			newServer := servers.GetLeastLoadedServer("lobby", player.CurrentServer().Server().ServerInfo().Name())
+			conn := player.CurrentServer()
+			if conn == nil {
+				//player.SendMessage(parsedComponent)
+				//player.Disconnect(parsedComponent)
+				connect, err := player.CreateConnectionRequest(servers.GetLeastLoadedServer("cytosis", "lobby")).Connect(ctx)
+				if err != nil {
+					player.Disconnect(parsedComponent)
+					return
+				}
+				if connect.Status().ConnectionInProgress() {
+					//todo figure this shit show ou t
+				}
+				return
+			}
+			newServer, success := servers.GetFallbackFromServer(player.CurrentServer().Server())
+			if !success {
+				player.Disconnect(parsedComponent)
+				return
+			}
 			player.CreateConnectionRequest(newServer).ConnectWithIndication(ctx)
 		} else {
 			player.Disconnect(parsedComponent)

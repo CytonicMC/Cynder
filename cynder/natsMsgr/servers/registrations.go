@@ -17,6 +17,7 @@ func ListenForServerRegistrations(nc messaging.NatsService, proxy *proxy.Proxy) 
 
 	err := nc.Subscribe(subject, func(msg *nats.Msg) {
 		var server registry.ServerInfo
+		log.Printf("Received message: %s\n", string(msg.Data))
 		if err := json.Unmarshal(msg.Data, &server); err != nil {
 			log.Printf("Invalid message format: %s", msg.Data)
 			return
@@ -29,7 +30,7 @@ func ListenForServerRegistrations(nc messaging.NatsService, proxy *proxy.Proxy) 
 			log.Printf("Failed to register server: %s", msg.Data)
 			return
 		}
-		AddServerToGroup(server.Group, registeredServer)
+		AddServerToGroup(server.Group, server.Type, registeredServer)
 		log.Printf("Registered server: '%s' in group '%s'", server.ID, server.Group)
 	})
 	if err != nil {
@@ -51,7 +52,12 @@ func ListenForServerShutdowns(nc messaging.NatsService, proxy *proxy.Proxy) {
 
 		// actually do something with server
 		registeredServer := proxy.Server(server.ID)
-		RemoveServerFromGroup(server.Group, registeredServer)
+		RemoveServerFromGroup(server.Group, server.Type, registeredServer)
+
+		if registeredServer == nil {
+			log.Printf("No registered server under ID '%s'", server.ID)
+			return
+		}
 
 		proxy.Unregister(registeredServer.ServerInfo())
 	})
@@ -80,8 +86,8 @@ func FetchServers(nc messaging.NatsService, proxy *proxy.Proxy) {
 			log.Printf("Failed to register server: %s", msg.Data)
 			return
 		}
-		AddServerToGroup(server.Group, registeredServer)
-		log.Printf("Registered server: '%s' in group '%s' from Cydian!", server.ID, server.Group)
+		AddServerToGroup(server.Group, server.Type, registeredServer)
+		log.Printf("Registered server: '%s' in group '%s' with type '%s' from Cydian!", server.ID, server.Group, server.Type)
 
 	}
 

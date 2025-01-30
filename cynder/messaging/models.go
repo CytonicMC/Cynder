@@ -7,3 +7,8 @@ type PlayerChangeServerContainer struct {
 	OldServer string    `json:"oldServer"`
 	NewServer string    `json:"newServer"`
 }
+
+type ServerSendResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
