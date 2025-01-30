@@ -5,15 +5,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/CytonicMC/Cynder/cynder/messaging"
+	"github.com/CytonicMC/Cynder/cynder/natsMsgr/servers"
 	"github.com/nats-io/nats.go"
 	"go.minekube.com/gate/pkg/edition/java/proxy"
 	"go.minekube.com/gate/pkg/util/uuid"
+	"time"
 )
 
 type SendPlayerToServerContainer struct {
 	Player   uuid.UUID `json:"player"`
 	ServerID string    `json:"serverId"`
 	Instance uuid.UUID `json:"instance"`
+}
+
+type SendPlayerToGenericServerContainer struct {
+	Player uuid.UUID `json:"player"`
+	Group  string    `json:"group"`
+	Type   string    `json:"type"`
 }
 
 func HandlePlayerSend(subscriber messaging.NatsService, proxy *proxy.Proxy, ctx context.Context) {
@@ -75,12 +83,105 @@ func HandlePlayerSend(subscriber messaging.NatsService, proxy *proxy.Proxy, ctx 
 	}
 }
 
+func HandleGenericSend(subscriber messaging.NatsService, proxy *proxy.Proxy, ctx context.Context) {
+	err := subscriber.Subscribe("players.send.generic", func(msg *nats.Msg) {
+		data := string(msg.Data)
+		var container SendPlayerToGenericServerContainer
+		err := json.Unmarshal([]byte(data), &container)
+
+		fmt.Printf("Generic?? %s\n", data)
+
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		player := proxy.Player(container.Player)
+
+		if player == nil {
+			// player not on this proxy
+			return
+		}
+
+		server := servers.GetLeastLoadedServer(container.Group, container.Type)
+		if server == nil {
+			respond(msg, messaging.ServerSendResponse{
+				Success: false,
+				Message: "ERR_SERVER_NOT_FOUND",
+			})
+			return
+		}
+
+		newCtx, cancel := context.WithTimeout(ctx, 7*time.Second)
+		defer cancel()
+
+		//connect, err1 := player.CreateConnectionRequest(server).Connect(newCtx)
+		success := player.CreateConnectionRequest(server).ConnectWithIndication(newCtx)
+		if success {
+			respond(msg, messaging.ServerSendResponse{
+				Success: true,
+				Message: "SUCCESS",
+			})
+		} else {
+			respond(msg, messaging.ServerSendResponse{
+				Success: false,
+				Message: "ERR_CONNECT_REQUEST_FAILED",
+			})
+		}
+		/*if err1 != nil {
+			fmt.Printf("Error: %v\n", err)
+
+			respond(msg, messaging.ServerSendResponse{
+				Success: false,
+				Message: "ERR_CONNECT_REQUEST_FAILED",
+			})
+			return
+		}
+		if connect.Status().ServerDisconnected() {
+			respond(msg, messaging.ServerSendResponse{
+				Success: false,
+				Message: "ERR_SERVER_DISCONNECT",
+			})
+		} else if connect.Status().Canceled() {
+			respond(msg, messaging.ServerSendResponse{
+				Success: false,
+				Message: "ERR_CONNECTION_CANCELED",
+			})
+		} else if connect.Status().AlreadyConnected() {
+			respond(msg, messaging.ServerSendResponse{
+				Success: false,
+				Message: "ERR_ALREADY_CONNECTED",
+			})
+		} else if connect.Status().ConnectionInProgress() {
+			respond(msg, messaging.ServerSendResponse{
+				Success: false,
+				Message: "ERR_DIFFERENT_CONNECTION_IN_PROGRESS",
+			})
+		} else if connect.Status().Successful() {
+			respond(msg, messaging.ServerSendResponse{
+				Success: true,
+				Message: "",
+			})
+		} else {
+			fmt.Printf("Generic?? %+v\n", connect)
+			respond(msg, messaging.ServerSendResponse{
+				Success: false,
+				Message: "ERR_UNKNOWN",
+			})
+		}*/
+	})
+	if err != nil {
+		fmt.Printf("error subscribing to subject player.send: %s", err)
+	}
+}
+
 func respond(msg *nats.Msg, response messaging.ServerSendResponse) {
 	reponse, err1 := json.Marshal(&response)
 	if err1 != nil {
 		fmt.Println(err1) // aka ya done did gonna be kicked
 		return
 	}
+	fmt.Println(string(reponse))
 	err := msg.Respond(reponse)
 	if err != nil {
 		fmt.Println(err)

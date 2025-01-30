@@ -32,6 +32,9 @@ func RemoveServerFromGroup(group string, serverType string, server proxy.Registe
 	if serversByType, exists := currentServers[group]; exists {
 		if servers, exists := serversByType[serverType]; exists {
 			for i, s := range servers {
+				if s == nil || s.ServerInfo() == nil || server == nil || server.ServerInfo() == nil {
+					return
+				}
 				if s.ServerInfo().Name() == server.ServerInfo().Name() {
 					// Remove the server from the slice
 					currentServers[group][serverType] = append(servers[:i], servers[i+1:]...)

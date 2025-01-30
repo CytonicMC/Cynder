@@ -48,6 +48,7 @@ var Plugin = proxy.Plugin{
 
 		// player stuff
 		players.HandlePlayerSend(ns, p, ctx)
+		players.HandleGenericSend(ns, p, ctx)
 		players.HandlePlayerKick(ns, p, ctx)
 
 		// servers
