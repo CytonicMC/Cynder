@@ -64,6 +64,8 @@ func GetLeastLoadedServer(group string, serverType string, excludeIds ...string)
 		if contains(excludeIds, server.ServerInfo().Name()) {
 			continue
 		}
+
+		fmt.Printf("Server %s has %d players! Least load is: %d, which is server %s\n", server.ServerInfo().Name(), server.Players().Len(), leastLoad, leastLoadedServer.ServerInfo().Name())
 		if server.Players().Len() < leastLoad {
 			leastLoad = server.Players().Len()
 			leastLoadedServer = server
