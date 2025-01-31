@@ -72,9 +72,6 @@ func GetLeastLoadedServer(group string, serverType string, excludeIds ...string)
 		}
 	}
 
-	if leastLoadedServer == nil {
-		return nil
-	}
 	return leastLoadedServer
 }
 
