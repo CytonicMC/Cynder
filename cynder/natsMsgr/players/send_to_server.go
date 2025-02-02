@@ -115,20 +115,20 @@ func HandleGenericSend(subscriber messaging.NatsService, proxy *proxy.Proxy, ctx
 		newCtx, cancel := context.WithTimeout(ctx, 7*time.Second)
 		defer cancel()
 
-		//connect, err1 := player.CreateConnectionRequest(server).Connect(newCtx)
-		success := player.CreateConnectionRequest(server).ConnectWithIndication(newCtx)
-		if success {
-			respond(msg, messaging.ServerSendResponse{
-				Success: true,
-				Message: "SUCCESS",
-			})
-		} else {
-			respond(msg, messaging.ServerSendResponse{
-				Success: false,
-				Message: "ERR_CONNECT_REQUEST_FAILED",
-			})
-		}
-		/*if err1 != nil {
+		connect, err1 := player.CreateConnectionRequest(server).Connect(newCtx)
+		//success := player.CreateConnectionRequest(server).ConnectWithIndication(newCtx)
+		//if success {
+		//	respond(msg, messaging.ServerSendResponse{
+		//		Success: true,
+		//		Message: "SUCCESS",
+		//	})
+		//} else {
+		//	respond(msg, messaging.ServerSendResponse{
+		//		Success: false,
+		//		Message: "ERR_CONNECT_REQUEST_FAILED",
+		//	})
+		//}
+		if err1 != nil {
 			fmt.Printf("Error: %v\n", err)
 
 			respond(msg, messaging.ServerSendResponse{
@@ -168,7 +168,7 @@ func HandleGenericSend(subscriber messaging.NatsService, proxy *proxy.Proxy, ctx
 				Success: false,
 				Message: "ERR_UNKNOWN",
 			})
-		}*/
+		}
 	})
 	if err != nil {
 		fmt.Printf("error subscribing to subject player.send: %s", err)

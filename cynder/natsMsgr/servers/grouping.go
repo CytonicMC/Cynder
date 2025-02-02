@@ -9,6 +9,7 @@ import (
 // then V
 var fallbackHierarchy = map[string][]string{
 	"gilded_gorge": {"instancing_server", "hub"},
+	"bedwars":      {"game_server", "lobby"},
 	"cytonic":      {"lobby"},
 }
 
@@ -156,6 +157,21 @@ func GetFallbackFromServer(currentServer proxy.RegisteredServer, excludeIds ...s
 	// Get the fallback server
 	fallbackServer, found := GetFallbackServer(currentGroup, serverType, append(excludeIds, currentServer.ServerInfo().Name())...)
 	if found {
+		return fallbackServer, true
+	}
+
+	// Find the last group and type in the fallback hierarchy
+	var lastGroup, lastType string
+	for group, types := range fallbackHierarchy {
+		if len(types) > 0 {
+			lastGroup, lastType = group, types[len(types)-1] // Last type in the group
+		}
+	}
+
+	// If no fallback found, default to the last resolved group and type
+	fmt.Printf("No fallback found for server %s, defaulting to %s:%s\n", currentServer.ServerInfo().Name(), lastGroup, lastType)
+	fallbackServer = GetLeastLoadedServer(lastGroup, lastType, append(excludeIds, currentServer.ServerInfo().Name())...)
+	if fallbackServer != nil {
 		return fallbackServer, true
 	}
 
