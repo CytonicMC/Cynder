@@ -9,7 +9,7 @@ import (
 // then V
 var fallbackHierarchy = map[string][]string{
 	"gilded_gorge": {"instancing_server", "hub"},
-	"bedwars":      {"game_server", "lobby"},
+	"bedwars":      {"quads", "duos", "solos", "lobby"},
 	"cytonic":      {"lobby"},
 }
 
