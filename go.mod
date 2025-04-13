@@ -8,7 +8,7 @@ require (
 	github.com/CytonicMC/Cydian v0.0.2
 	github.com/go-logr/logr v1.4.2
 	github.com/nats-io/nats.go v1.39.0
-	github.com/redis/go-redis/v9 v9.7.0
+	github.com/redis/go-redis/v9 v9.7.3
 	github.com/robinbraemer/event v0.1.1
 	go.minekube.com/common v0.0.6
 	go.minekube.com/gate v0.47.0
