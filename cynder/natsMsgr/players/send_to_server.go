@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/CytonicMC/Cynder/cynder/messaging"
 	"github.com/CytonicMC/Cynder/cynder/natsMsgr/servers"
+	"github.com/CytonicMC/Cynder/cynder/redis"
 	"github.com/nats-io/nats.go"
 	"go.minekube.com/gate/pkg/edition/java/proxy"
 	"go.minekube.com/gate/pkg/util/uuid"
@@ -43,6 +44,11 @@ func HandlePlayerSend(subscriber messaging.NatsService, proxy *proxy.Proxy, ctx 
 		}
 
 		server := proxy.Server(container.ServerID)
+
+		if &container.Instance != nil {
+			redis.SetValue(fmt.Sprintf("%s#target_instance", container.Player.String()), container.Instance.String())
+		}
+
 		//todo: convey the instance somehow. Perhaps spoofchat?? Or cookies
 		connect, err := player.CreateConnectionRequest(server).Connect(ctx)
 		if err != nil {
@@ -116,18 +122,7 @@ func HandleGenericSend(subscriber messaging.NatsService, proxy *proxy.Proxy, ctx
 		defer cancel()
 
 		connect, err1 := player.CreateConnectionRequest(server).Connect(newCtx)
-		//success := player.CreateConnectionRequest(server).ConnectWithIndication(newCtx)
-		//if success {
-		//	respond(msg, messaging.ServerSendResponse{
-		//		Success: true,
-		//		Message: "SUCCESS",
-		//	})
-		//} else {
-		//	respond(msg, messaging.ServerSendResponse{
-		//		Success: false,
-		//		Message: "ERR_CONNECT_REQUEST_FAILED",
-		//	})
-		//}
+
 		if err1 != nil {
 			fmt.Printf("Error: %v\n", err)
 
