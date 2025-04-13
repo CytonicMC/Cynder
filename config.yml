@@ -12,8 +12,8 @@ config:
   status:
     # The message of the day in legacy '§' format or modern text component '{"text":"...", ...}' json.
     motd: |
-      §6A Gate Proxy
-      §bVisit ➞ §fgithub.com/minekube/gate
+      §dCytonicMC Alpha Testing Server
+      §aVisit ➞ §ccytonic.net
     # The maximum players shown (is not the actual player limit!).
     showMaxPlayers: 1000
     # The server image (optimal 64x64); a path of an image file or the base64 data uri.
