@@ -2,7 +2,7 @@ module github.com/CytonicMC/Cynder
 
 go 1.23.2
 
-toolchain go1.23.5
+toolchain go1.24.2
 
 require (
 	github.com/CytonicMC/Cydian v0.0.2
