@@ -7,6 +7,7 @@ import (
 	"github.com/CytonicMC/Cynder/cynder/natsMsgr"
 	"github.com/CytonicMC/Cynder/cynder/natsMsgr/players"
 	"github.com/CytonicMC/Cynder/cynder/natsMsgr/servers"
+	"github.com/CytonicMC/Cynder/cynder/redis"
 	"github.com/CytonicMC/Cynder/cynder/util/mini"
 	"github.com/go-logr/logr"
 	"github.com/nats-io/nats.go"
@@ -18,7 +19,6 @@ import (
 type Dependencies struct {
 	NatsConn *nats.Conn
 	Logger   logr.Logger
-	//Redis    redis.Client
 }
 
 var (
@@ -65,7 +65,7 @@ var Plugin = proxy.Plugin{
 func InitializeDependencies(ctx context.Context, p *proxy.Proxy) (*Dependencies, error) {
 	log := logr.FromContextOrDiscard(ctx).WithName("Cynder")
 	natsConn := natsMsgr.ConnectToNats()
-	//redisClient := redis.PubsubClient() // Assuming NewClient initializes Redis
+	redis.PubsubClient()
 
 	return &Dependencies{
 		NatsConn: natsConn,
