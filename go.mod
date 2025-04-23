@@ -11,7 +11,7 @@ require (
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/robinbraemer/event v0.1.1
 	go.minekube.com/common v0.0.6
-	go.minekube.com/gate v0.47.0
+	go.minekube.com/gate v0.48.1
 )
 
 require (
