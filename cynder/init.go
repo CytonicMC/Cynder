@@ -102,7 +102,7 @@ func registerEvents(p *proxy.Proxy, nc messaging.NatsService, logger logr.Logger
 		players.BroadcastPlayerLeave(nc, e.Player().Username(), id, logger)
 	})
 
-	event.Subscribe(p.Event(), 0, func(e *proxy.ServerPostConnectEvent) {
+	event.Subscribe(p.Event(), 100, func(e *proxy.ServerPostConnectEvent) {
 
 		var oldServer string
 		if e.PreviousServer() != nil {
@@ -128,22 +128,29 @@ func registerEvents(p *proxy.Proxy, nc messaging.NatsService, logger logr.Logger
 		}
 	})
 
-	event.Subscribe(p.Event(), 0, func(e *proxy.KickedFromServerEvent) {
+	event.Subscribe(p.Event(), 100, func(e *proxy.KickedFromServerEvent) {
 
 		server, success := servers.GetFallbackFromServer(e.Server())
 
 		if !success {
-			msg := mini.Parse("<color:red>Failed to rescue from internal disconnect. Inital kick reason: ")
-			msg.SetChildren([]component.Component{e.OriginalReason()})
+			msg := mini.Parse("<color:red><bold>WHOOPS!</bold></color:red><color:gray> Failed to rescue from internal disconnect. Initial kick reason: ")
 			e.SetResult(&proxy.DisconnectPlayerKickResult{
-				Reason: msg,
+				Reason: &component.Text{
+					Content: "",
+					S:       component.Style{},
+					Extra: []component.Component{
+						msg,
+						e.OriginalReason(),
+					},
+				},
 			})
-			return
+			logger.Info("Failed to rescue from internal disconnect. ")
+		} else {
+			logger.Info("Successfully rescued from internal disconnect. ")
+			e.SetResult(&proxy.RedirectPlayerKickResult{
+				Server:  server,
+				Message: mini.Parse("<color:gold><bold>YOINK!</bold></color:gold><color:gray> A kick occurred in your connection, so you were placed in a lobby!"),
+			})
 		}
-
-		e.SetResult(&proxy.RedirectPlayerKickResult{
-			Server:  server,
-			Message: mini.Parse("<color:gold><bold>YOINK!</bold></color:gold><color:gray> A kick occured in your connection, so you were placed in a lobby!"),
-		})
 	})
 }

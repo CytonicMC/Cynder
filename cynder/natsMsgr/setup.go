@@ -15,9 +15,10 @@ func ConnectToNats() *nats.Conn {
 	hostname := os.Getenv("NATS_HOSTNAME")
 	port := os.Getenv("NATS_PORT")
 
-	nc, err := nats.Connect(fmt.Sprintf("nats://%s:%s@%s:%s", username, password, hostname, port))
+	url := fmt.Sprintf("nats://%s:%s@%s:%s", username, password, hostname, port)
+	nc, err := nats.Connect(url)
 	if err != nil {
-		log.Fatalf("Error connecting to natsMsgr: %v", err)
+		log.Fatalf("Error connecting to nats: %v \n\nURL: %s", err, url)
 	}
 	//defer nc.Close()
 	log.Println("Connected to nats!")
