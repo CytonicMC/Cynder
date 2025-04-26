@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/CytonicMC/Cynder/cynder/messaging"
 	"github.com/CytonicMC/Cynder/cynder/natsMsgr/servers"
-	"github.com/CytonicMC/Cynder/cynder/redis"
+	"github.com/CytonicMC/Cynder/cynder/util"
 	"github.com/nats-io/nats.go"
 	"go.minekube.com/gate/pkg/edition/java/proxy"
 	"go.minekube.com/gate/pkg/util/uuid"
@@ -25,8 +25,8 @@ type SendPlayerToGenericServerContainer struct {
 	Type   string    `json:"type"`
 }
 
-func HandlePlayerSend(subscriber messaging.NatsService, proxy *proxy.Proxy, ctx context.Context) {
-	err := subscriber.Subscribe("players.send", func(msg *nats.Msg) {
+func HandlePlayerSend(services *util.Services, proxy *proxy.Proxy, ctx context.Context) {
+	err := services.Nats.Subscribe("players.send", func(msg *nats.Msg) {
 		data := string(msg.Data)
 		var container SendPlayerToServerContainer
 		err := json.Unmarshal([]byte(data), &container)
@@ -46,7 +46,7 @@ func HandlePlayerSend(subscriber messaging.NatsService, proxy *proxy.Proxy, ctx 
 		server := proxy.Server(container.ServerID)
 
 		if &container.Instance != nil {
-			redis.SetValue(fmt.Sprintf("%s#target_instance", container.Player.String()), container.Instance.String())
+			services.Redis.SetValue(fmt.Sprintf("%s#target_instance", container.Player.String()), container.Instance.String())
 		}
 
 		//todo: convey the instance somehow. Perhaps spoofchat?? Or cookies
@@ -89,8 +89,8 @@ func HandlePlayerSend(subscriber messaging.NatsService, proxy *proxy.Proxy, ctx 
 	}
 }
 
-func HandleGenericSend(subscriber messaging.NatsService, proxy *proxy.Proxy, ctx context.Context) {
-	err := subscriber.Subscribe("players.send.generic", func(msg *nats.Msg) {
+func HandleGenericSend(services *util.Services, proxy *proxy.Proxy, ctx context.Context) {
+	err := services.Nats.Subscribe("players.send.generic", func(msg *nats.Msg) {
 		data := string(msg.Data)
 		var container SendPlayerToGenericServerContainer
 		err := json.Unmarshal([]byte(data), &container)

@@ -4,17 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/CytonicMC/Cynder/cynder/messaging"
 	"github.com/CytonicMC/Cynder/cynder/natsMsgr/servers"
+	"github.com/CytonicMC/Cynder/cynder/util"
 	"github.com/nats-io/nats.go"
 	"go.minekube.com/gate/pkg/edition/java/proxy"
 	"go.minekube.com/gate/pkg/util/componentutil"
 	"go.minekube.com/gate/pkg/util/uuid"
 )
 
-func HandlePlayerKick(nc messaging.NatsService, proxyInstance *proxy.Proxy, ctx context.Context) {
+func HandlePlayerKick(services *util.Services, proxyInstance *proxy.Proxy, ctx context.Context) {
 	const subject = "players.kick"
-	err := nc.Subscribe(subject, func(msg *nats.Msg) {
+	err := services.Nats.Subscribe(subject, func(msg *nats.Msg) {
 		data := string(msg.Data)
 		packet, err1 := Deserialize(data)
 		if err1 != nil {

@@ -3,35 +3,38 @@ package cynder
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/CytonicMC/Cynder/cynder/messaging"
-	"github.com/CytonicMC/Cynder/cynder/natsMsgr"
 	"github.com/CytonicMC/Cynder/cynder/natsMsgr/players"
 	"github.com/CytonicMC/Cynder/cynder/natsMsgr/servers"
 	"github.com/CytonicMC/Cynder/cynder/redis"
+	"github.com/CytonicMC/Cynder/cynder/util"
 	"github.com/CytonicMC/Cynder/cynder/util/mini"
 	"github.com/go-logr/logr"
 	"github.com/nats-io/nats.go"
+	redis2 "github.com/redis/go-redis/v9"
 	"github.com/robinbraemer/event"
 	"go.minekube.com/common/minecraft/component"
 	"go.minekube.com/gate/pkg/edition/java/proxy"
+	"log"
+	"os"
 )
 
 type Dependencies struct {
-	NatsConn *nats.Conn
-	Logger   logr.Logger
+	NatsConn    *nats.Conn
+	Logger      logr.Logger
+	RedisClient *redis2.Client
 }
 
 var (
-	NatsService messaging.NatsService
-	Instance    *Cynder
-	Context     context.Context
+	Instance *Cynder
 )
 
 // Plugin initialization using dependencies
 var Plugin = proxy.Plugin{
 	Name: "CynderInit",
 	Init: func(ctx context.Context, p *proxy.Proxy) error {
-		deps, err := InitializeDependencies(ctx, p)
+		deps, err := InitializeDependencies(ctx)
 		if err != nil {
 			return err
 		}
@@ -40,47 +43,51 @@ var Plugin = proxy.Plugin{
 			Conn: deps.NatsConn,
 		}
 
-		Instance = &Cynder{
-			proxy:        p,
-			dependencies: deps,
+		rs := &redis.ServiceImpl{
+			Client: deps.RedisClient,
 		}
-		Context = ctx
+
+		Instance = &Cynder{
+			Proxy:        p,
+			dependencies: deps,
+			Services: &util.Services{
+				Nats:  ns,
+				Redis: rs,
+			},
+		}
 
 		// player stuff
-		players.HandlePlayerSend(ns, p, ctx)
-		players.HandleGenericSend(ns, p, ctx)
-		players.HandlePlayerKick(ns, p, ctx)
+		players.HandlePlayerSend(Instance.Services, p, ctx)
+		players.HandleGenericSend(Instance.Services, p, ctx)
+		players.HandlePlayerKick(Instance.Services, p, ctx)
 
 		// servers
 		servers.FetchServers(ns, p)
 		servers.ListenForServerRegistrations(ns, p)
 		servers.ListenForServerShutdowns(ns, p)
 
-		registerEvents(p, ns, deps.Logger)
+		registerEvents(p, ns, deps.Logger, rs)
 
 		return nil
 	},
 }
 
-func InitializeDependencies(ctx context.Context, p *proxy.Proxy) (*Dependencies, error) {
-	log := logr.FromContextOrDiscard(ctx).WithName("Cynder")
-	natsConn := natsMsgr.ConnectToNats()
-	redis.PubsubClient()
-
+func InitializeDependencies(ctx context.Context) (*Dependencies, error) {
 	return &Dependencies{
-		NatsConn: natsConn,
-		Logger:   log,
-		//Redis:    redisClient,
+		NatsConn:    ConnectToNats(),
+		Logger:      logr.FromContextOrDiscard(ctx).WithName("Cynder"),
+		RedisClient: redis.ConnectToRedis(),
 	}, nil
 }
 
 type Cynder struct {
-	proxy        *proxy.Proxy
 	dependencies *Dependencies
+	Proxy        *proxy.Proxy
+	Services     *util.Services
 }
 
 // when joining for the first time, the player is always sent to a lobby
-func registerEvents(p *proxy.Proxy, nc messaging.NatsService, logger logr.Logger) {
+func registerEvents(p *proxy.Proxy, nc messaging.NatsService, logger logr.Logger, rc redis.Service) {
 	event.Subscribe(p.Event(), 0, func(e *proxy.PlayerChooseInitialServerEvent) {
 		server := servers.GetLeastLoadedServer("cytonic", "lobby")
 		//server := servers.GetLeastLoadedServer("gilded_gorge", "hub")
@@ -95,11 +102,15 @@ func registerEvents(p *proxy.Proxy, nc messaging.NatsService, logger logr.Logger
 	event.Subscribe(p.Event(), 0, func(e *proxy.PreLoginEvent) {
 		id, _ := e.ID()
 		players.BroadcastPlayerJoin(nc, e.Username(), id, logger)
+		rc.SetHash("online_players", id.String(), e.Username())
 	})
 
 	event.Subscribe(p.Event(), 0, func(e *proxy.DisconnectEvent) {
 		id := e.Player().ID()
 		players.BroadcastPlayerLeave(nc, e.Player().Username(), id, logger)
+		rc.RemHash("online_players", id.String())
+		rc.RemHash("player_servers", id.String())
+
 	})
 
 	event.Subscribe(p.Event(), 100, func(e *proxy.ServerPostConnectEvent) {
@@ -114,6 +125,8 @@ func registerEvents(p *proxy.Proxy, nc messaging.NatsService, logger logr.Logger
 			OldServer: oldServer,
 			NewServer: e.Player().CurrentServer().Server().ServerInfo().Name(),
 		}
+
+		rc.SetHash("player_servers", e.Player().ID().String(), container.NewServer)
 
 		data, err := json.Marshal(container)
 		if err != nil {
@@ -153,4 +166,23 @@ func registerEvents(p *proxy.Proxy, nc messaging.NatsService, logger logr.Logger
 			})
 		}
 	})
+}
+
+func ConnectToNats() *nats.Conn {
+
+	// Connect to natsMsgr server
+	username := os.Getenv("NATS_USERNAME")
+	password := os.Getenv("NATS_PASSWORD")
+	hostname := os.Getenv("NATS_HOSTNAME")
+	port := os.Getenv("NATS_PORT")
+
+	url := fmt.Sprintf("nats://%s:%s@%s:%s", username, password, hostname, port)
+	nc, err := nats.Connect(url)
+	if err != nil {
+		log.Fatalf("Error connecting to nats: %v \n\nURL: %s", err, url)
+	}
+	//defer nc.Close()
+	log.Println("Connected to nats!")
+
+	return nc
 }
