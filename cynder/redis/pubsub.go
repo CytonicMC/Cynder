@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"github.com/redis/go-redis/v9"
 	"os"
+	"time"
 )
 
 var ctx = context.Background()
 
 type Service interface {
 	SetValue(key string, value string)
+	SetExpiringValue(key string, value string, expiry int64)
 	SetHash(key string, field string, value string)
 	RemHash(key string, field string)
 	ReadValue(key string) string
@@ -33,6 +35,13 @@ func (n *ServiceImpl) SetValue(key string, value string) {
 	// this can be fully async
 	go func() {
 		n.Client.Set(ctx, key, value, 0)
+	}()
+}
+
+func (n *ServiceImpl) SetExpiringValue(key string, value string, expiry int64) {
+	// this can be fully async
+	go func() {
+		n.Client.Set(ctx, key, value, time.Duration(expiry)*time.Second)
 	}()
 }
 

@@ -1,7 +1,7 @@
 # This is a simplified config where the rest of the settings are omitted and will be set by default.
 # See https://gate.minekube.com/guide/config/ for the full configuration options.
 config:
-  bind: 0.0.0.0:25577
+  bind: 0.0.0.0:34969
   onlineMode: true
   builtinCommands: false
   servers:
@@ -12,7 +12,7 @@ config:
   status:
     # The message of the day in legacy '§' format or modern text component '{"text":"...", ...}' json.
     motd: |
-      §dCytonicMC Alpha Testing Server
+      §b§lCytonicMC§r§b Alpha Testing Server
       §aVisit ➞ §ccytonic.net
     # The maximum players shown (is not the actual player limit!).
     showMaxPlayers: 1000

@@ -14,9 +14,9 @@ import (
 )
 
 type SendPlayerToServerContainer struct {
-	Player   uuid.UUID `json:"player"`
-	ServerID string    `json:"serverId"`
-	Instance uuid.UUID `json:"instance"`
+	Player   uuid.UUID  `json:"player"`
+	ServerID string     `json:"serverId"`
+	Instance *uuid.UUID `json:"instance"`
 }
 
 type SendPlayerToGenericServerContainer struct {
@@ -32,7 +32,11 @@ func HandlePlayerSend(services *util.Services, proxy *proxy.Proxy, ctx context.C
 		err := json.Unmarshal([]byte(data), &container)
 
 		if err != nil {
-			fmt.Println(err)
+			fmt.Printf("failed to unmarshal SendPlayerToServerContainer: %s", err)
+			respond(msg, messaging.ServerSendResponse{
+				Success: false,
+				Message: "ERR_REQUEST_PROCESSING_FAILURE",
+			})
 			return
 		}
 
@@ -45,8 +49,12 @@ func HandlePlayerSend(services *util.Services, proxy *proxy.Proxy, ctx context.C
 
 		server := proxy.Server(container.ServerID)
 
-		if &container.Instance != nil {
-			services.Redis.SetValue(fmt.Sprintf("%s#target_instance", container.Player.String()), container.Instance.String())
+		if container.Instance != nil {
+			services.Redis.SetExpiringValue(
+				fmt.Sprintf("%s#target_instance", container.Player.String()),
+				container.Instance.String(),
+				3,
+			)
 		}
 
 		//todo: convey the instance somehow. Perhaps spoofchat?? Or cookies

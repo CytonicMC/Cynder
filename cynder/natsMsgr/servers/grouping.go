@@ -95,6 +95,7 @@ func GetFallbackServer(currentGroup string, serverType string, excludeIds ...str
 		}
 
 		// If no fallback found, use the "bottom type" of the current group
+		nextGroup = currentGroup
 		nextType = fallbackHierarchy[currentGroup][len(fallbackHierarchy[currentGroup])-1]
 	}
 
@@ -105,7 +106,14 @@ func GetFallbackServer(currentGroup string, serverType string, excludeIds ...str
 	}
 
 	// If the fallback type still doesn't have a server, recursively try the next fallback group
-	return GetFallbackServer(nextGroup, serverType, excludeIds...)
+	// BUT only if we actually found a valid next fallback to prevent infinite recursion
+	if found {
+		return GetFallbackServer(nextGroup, nextType, excludeIds...)
+	}
+
+	// If we've exhausted all fallbacks, return failure
+	fmt.Printf("No servers available in any fallback for group %s, type %s\n", currentGroup, serverType)
+	return nil, false
 }
 
 func GetNextFallbackGroup(currentGroup string, typeToStartFrom string) (string, string, bool) {
@@ -133,6 +141,7 @@ func GetNextFallbackGroup(currentGroup string, typeToStartFrom string) (string, 
 							return nextGroup, fallbackHierarchy[nextGroup][0], true
 						}
 					}
+					fmt.Printf("No further fallbacks available for group %s and type %s\n", currentGroup, typeToStartFrom)
 					return "", "", false // No further fallbacks
 				}
 			}
@@ -158,86 +167,58 @@ func GetFallbackFromServer(currentServer proxy.RegisteredServer, excludeIds ...s
 		}
 	}
 
-	// If we couldn't determine the group, fallback to the next in hierarchy within the same group
-	if currentGroup == "" || serverType == "" {
-		fmt.Printf("Server %s not found in any group, attempting fallback to next in hierarchy\n", currentServer.ServerInfo().Name())
-
-		// Check if the current group has fallbacks (hierarchy)
-		if currentGroup != "" && len(fallbackHierarchy[currentGroup]) > 0 {
-			// Get the next fallback in the same group
-			nextTypeIndex := -1
-			for i, fallbackType := range fallbackHierarchy[currentGroup] {
-				if fallbackType == serverType {
-					nextTypeIndex = i + 1
-					break
-				}
-			}
-
-			// If we found a valid next type within the same group
-			if nextTypeIndex > 0 && nextTypeIndex < len(fallbackHierarchy[currentGroup]) {
-				nextType := fallbackHierarchy[currentGroup][nextTypeIndex]
-				// Get the least loaded server from the next fallback type
-				fallbackServer := GetLeastLoadedServer(currentGroup, nextType, append(excludeIds, currentServer.ServerInfo().Name())...)
-				if fallbackServer != nil {
-					fmt.Printf("Fallback server found: %s\n", fallbackServer.ServerInfo().Name())
-					return fallbackServer, true
-				}
-			}
-		}
-
-		// If no valid fallback within the current group, fall back to another group
-		nextGroup, nextType, found := GetNextFallbackGroup(currentGroup, serverType)
+	// If we found the server's group and type, try normal fallback
+	if currentGroup != "" && serverType != "" {
+		fallbackServer, found := GetFallbackServer(currentGroup, serverType, append(excludeIds, currentServer.ServerInfo().Name())...)
 		if found {
-			// Get the least loaded server from the next group and type
-			fallbackServer := GetLeastLoadedServer(nextGroup, nextType, append(excludeIds, currentServer.ServerInfo().Name())...)
+			return fallbackServer, true
+		}
+	}
+
+	// If normal fallback failed or server wasn't found in groups, try alternative approaches
+	fmt.Printf("Server %s not found in any group or normal fallback failed, attempting alternative fallback\n", currentServer.ServerInfo().Name())
+
+	// Try fallback within the same group if we know the group but not the exact type
+	if currentGroup != "" && len(fallbackHierarchy[currentGroup]) > 0 {
+		// If we know the serverType, try to find next in hierarchy
+
+		// Try the last type in the current group's hierarchy (Typically a lobby or hub)
+		firstType := fallbackHierarchy[currentGroup][len(fallbackHierarchy[currentGroup])-1]
+		fallbackServer := GetLeastLoadedServer(currentGroup, firstType, append(excludeIds, currentServer.ServerInfo().Name())...)
+		if fallbackServer != nil {
+			fmt.Printf("Fallback server found in same group: %s\n", fallbackServer.ServerInfo().Name())
+			return fallbackServer, true
+		}
+	}
+	// If still no success, try other groups in fallback hierarchy
+	for group, types := range fallbackHierarchy {
+		if group != currentGroup && len(types) > 0 {
+			// Try the first type in this group
+			fallbackServer := GetLeastLoadedServer(group, types[0], append(excludeIds, currentServer.ServerInfo().Name())...)
 			if fallbackServer != nil {
-				fmt.Printf("Fallback server found in next group: %s\n", fallbackServer.ServerInfo().Name())
+				fmt.Printf("Fallback server found in different group: %s\n", fallbackServer.ServerInfo().Name())
 				return fallbackServer, true
 			}
 		}
+	}
 
-		// If no fallback found, default to the last resolved group and type
-		lastGroup, lastType := "", ""
-		for group, types := range fallbackHierarchy {
-			if len(types) > 0 {
-				lastGroup, lastType = group, types[len(types)-1] // Last type in the group
+	// Last resort: try any available server from any group/type
+	for _, types := range currentServers {
+		for _, servers := range types {
+			if len(servers) > 0 {
+				for _, server := range servers {
+					if !contains(append(excludeIds, currentServer.ServerInfo().Name()), server.ServerInfo().Name()) {
+						fmt.Printf("Last resort fallback server found: %s\n", server.ServerInfo().Name())
+						return server, true
+					}
+				}
 			}
 		}
-
-		// Try to get the least loaded server from the last fallback
-		fallbackServer := GetLeastLoadedServer(lastGroup, lastType, append(excludeIds, currentServer.ServerInfo().Name())...)
-		if fallbackServer != nil {
-			fmt.Printf("Fallback to last fallback server: %s\n", fallbackServer.ServerInfo().Name())
-			return fallbackServer, true
-		}
-
-		fmt.Printf("No fallback found for server %s\n", currentServer.ServerInfo().Name())
-		return nil, false
-	}
-
-	// Get the fallback server
-	fallbackServer, found := GetFallbackServer(currentGroup, serverType, append(excludeIds, currentServer.ServerInfo().Name())...)
-	if found {
-		return fallbackServer, true
-	}
-
-	// Find the last group and type in the fallback hierarchy
-	var lastGroup, lastType string
-	for group, types := range fallbackHierarchy {
-		if len(types) > 0 {
-			lastGroup, lastType = group, types[len(types)-1] // Last type in the group
-		}
-	}
-
-	// If no fallback found, default to the last resolved group and type
-	fmt.Printf("No fallback found for server %s, defaulting to %s:%s\n", currentServer.ServerInfo().Name(), lastGroup, lastType)
-	fallbackServer = GetLeastLoadedServer(lastGroup, lastType, append(excludeIds, currentServer.ServerInfo().Name())...)
-	if fallbackServer != nil {
-		return fallbackServer, true
 	}
 
 	fmt.Printf("No fallback found for server %s\n", currentServer.ServerInfo().Name())
 	return nil, false
+
 }
 
 // contains checks if a slice contains a specific element

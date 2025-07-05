@@ -110,7 +110,7 @@ func registerEvents(p *proxy.Proxy, nc messaging.NatsService, logger logr.Logger
 		players.BroadcastPlayerLeave(nc, e.Player().Username(), id, logger)
 		rc.RemHash("online_players", id.String())
 		rc.RemHash("player_servers", id.String())
-
+		rc.RemHash("cytosis:nicknames", id.String())
 	})
 
 	event.Subscribe(p.Event(), 100, func(e *proxy.ServerPostConnectEvent) {
@@ -143,7 +143,7 @@ func registerEvents(p *proxy.Proxy, nc messaging.NatsService, logger logr.Logger
 
 	event.Subscribe(p.Event(), 100, func(e *proxy.KickedFromServerEvent) {
 
-		server, success := servers.GetFallbackFromServer(e.Server())
+		server, success := servers.GetFallbackFromServer(e.Server(), e.Server().ServerInfo().Name())
 
 		if !success {
 			msg := mini.Parse("<color:red><bold>WHOOPS!</bold></color:red><color:gray> Failed to rescue from internal disconnect. Initial kick reason: ")
