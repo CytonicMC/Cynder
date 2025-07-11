@@ -14,6 +14,7 @@ import (
 	"github.com/nats-io/nats.go"
 	redis2 "github.com/redis/go-redis/v9"
 	"github.com/robinbraemer/event"
+	"go.minekube.com/common/minecraft/color"
 	"go.minekube.com/common/minecraft/component"
 	"go.minekube.com/gate/pkg/edition/java/proxy"
 	"log"
@@ -160,9 +161,25 @@ func registerEvents(p *proxy.Proxy, nc messaging.NatsService, logger logr.Logger
 			logger.Info("Failed to rescue from internal disconnect. ")
 		} else {
 			logger.Info("Successfully rescued from internal disconnect. ")
+			reason := e.OriginalReason()
+			if reason != nil {
+				reason.Style().Color = color.Red
+			}
+			comp := &component.Text{
+				Content: "",
+				S:       component.Style{},
+				Extra: []component.Component{
+					mini.Parse("<color:gold><bold>YOINK!</bold></color:gold><color:gray> A kick occurred in your connection, so you were placed in a lobby!"),
+					mini.Parse("<color:red>("),
+					e.OriginalReason(),
+					mini.Parse("<color:red>)"),
+				},
+			}
+			comp.SetChildren([]component.Component{})
+
 			e.SetResult(&proxy.RedirectPlayerKickResult{
 				Server:  server,
-				Message: mini.Parse("<color:gold><bold>YOINK!</bold></color:gold><color:gray> A kick occurred in your connection, so you were placed in a lobby!"),
+				Message: comp,
 			})
 		}
 	})
