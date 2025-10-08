@@ -10,7 +10,7 @@ require (
 	github.com/nats-io/nats.go v1.41.2
 	github.com/redis/go-redis/v9 v9.7.3
 	github.com/robinbraemer/event v0.1.1
-	go.minekube.com/common v0.0.6
+	go.minekube.com/common v0.3.0
 	go.minekube.com/gate v0.48.1
 )
 
