@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"os"
+
+	"github.com/CytonicMC/Cynder/cynder/env"
 	"github.com/CytonicMC/Cynder/cynder/messaging"
 	"github.com/CytonicMC/Cynder/cynder/natsMsgr/players"
 	"github.com/CytonicMC/Cynder/cynder/natsMsgr/servers"
@@ -17,8 +21,6 @@ import (
 	"go.minekube.com/common/minecraft/color"
 	"go.minekube.com/common/minecraft/component"
 	"go.minekube.com/gate/pkg/edition/java/proxy"
-	"log"
-	"os"
 )
 
 type Dependencies struct {
@@ -89,6 +91,7 @@ type Cynder struct {
 
 // when joining for the first time, the player is always sent to a lobby
 func registerEvents(p *proxy.Proxy, nc messaging.NatsService, logger logr.Logger, rc redis.Service) {
+
 	event.Subscribe(p.Event(), 0, func(e *proxy.PlayerChooseInitialServerEvent) {
 		server := servers.GetLeastLoadedServer("cytonic", "lobby")
 		//server := servers.GetLeastLoadedServer("gilded_gorge", "hub")
@@ -102,16 +105,27 @@ func registerEvents(p *proxy.Proxy, nc messaging.NatsService, logger logr.Logger
 
 	event.Subscribe(p.Event(), 0, func(e *proxy.PreLoginEvent) {
 		id, _ := e.ID()
+		if env.IsRestricted() {
+			if !util.CanJoinRestrictedServer(id, rc) {
+				e.Deny(mini.Parse("<color:red><bold>WHOOPS!</bold></color:red><color:gray> You are not allowed to join this server! Contact an administrator for a whitelist if you believe this is an error."))
+				return
+			}
+		}
+		banned, banMessage := util.IsBanned(id, rc)
+		if banned {
+			e.Deny(banMessage)
+			return
+		}
 		players.BroadcastPlayerJoin(nc, e.Username(), id, logger)
-		rc.SetHash("online_players", id.String(), e.Username())
+		rc.SetHashPrefixed("online_players", id.String(), e.Username())
 	})
 
 	event.Subscribe(p.Event(), 0, func(e *proxy.DisconnectEvent) {
 		id := e.Player().ID()
 		players.BroadcastPlayerLeave(nc, e.Player().Username(), id, logger)
-		rc.RemHash("online_players", id.String())
-		rc.RemHash("player_servers", id.String())
-		rc.RemHash("cytosis:nicknames", id.String())
+		rc.RemHashPrefixed("online_players", id.String())
+		rc.RemHashPrefixed("player_servers", id.String())
+		rc.RemHashPrefixed("cytosis:nicknames", id.String())
 	})
 
 	event.Subscribe(p.Event(), 100, func(e *proxy.ServerPostConnectEvent) {
@@ -127,7 +141,7 @@ func registerEvents(p *proxy.Proxy, nc messaging.NatsService, logger logr.Logger
 			NewServer: e.Player().CurrentServer().Server().ServerInfo().Name(),
 		}
 
-		rc.SetHash("player_servers", e.Player().ID().String(), container.NewServer)
+		rc.SetHashPrefixed("player_servers", e.Player().ID().String(), container.NewServer)
 
 		data, err := json.Marshal(container)
 		if err != nil {
@@ -175,7 +189,6 @@ func registerEvents(p *proxy.Proxy, nc messaging.NatsService, logger logr.Logger
 					mini.Parse("<color:red>)"),
 				},
 			}
-			comp.SetChildren([]component.Component{})
 
 			e.SetResult(&proxy.RedirectPlayerKickResult{
 				Server:  server,

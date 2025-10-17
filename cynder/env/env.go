@@ -27,6 +27,10 @@ func Prefix() string {
 	}
 }
 
+func IsRestricted() bool {
+	return Prefix() != "prod_"
+}
+
 // EnsurePrefixed prepends the environment prefix if the provided s does not
 // already start with one of the known prefixes. This prevents double-prefixing
 // in case callers inadvertently pass already-prefixed values.

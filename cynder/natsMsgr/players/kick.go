@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"github.com/CytonicMC/Cynder/cynder/natsMsgr/servers"
 	"github.com/CytonicMC/Cynder/cynder/util"
 	"github.com/nats-io/nats.go"
@@ -47,7 +48,7 @@ func HandlePlayerKick(services *util.Services, proxyInstance *proxy.Proxy, ctx c
 					return
 				}
 				if connect.Status().ConnectionInProgress() {
-					//todo figure this shit show ou t
+					//todo figure this shit show out
 				}
 				return
 			}

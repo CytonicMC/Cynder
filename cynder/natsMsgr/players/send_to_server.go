@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/CytonicMC/Cynder/cynder/messaging"
 	"github.com/CytonicMC/Cynder/cynder/natsMsgr/servers"
 	"github.com/CytonicMC/Cynder/cynder/util"
 	"github.com/nats-io/nats.go"
 	"go.minekube.com/gate/pkg/edition/java/proxy"
 	"go.minekube.com/gate/pkg/util/uuid"
-	"time"
 )
 
 type SendPlayerToServerContainer struct {
@@ -50,7 +51,7 @@ func HandlePlayerSend(services *util.Services, proxy *proxy.Proxy, ctx context.C
 		server := proxy.Server(container.ServerID)
 
 		if container.Instance != nil {
-			services.Redis.SetExpiringValue(
+			services.Redis.SetExpiringValueGlobal(
 				fmt.Sprintf("%s#target_instance", container.Player.String()),
 				container.Instance.String(),
 				3,

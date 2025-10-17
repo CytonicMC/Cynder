@@ -1,3 +1,3 @@
 #!/bin/bash
 
-./DockerImageBuildAndPush.sh v1.0.11
+./DockerImageBuildAndPush.sh v1.1.0
