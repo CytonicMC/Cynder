@@ -105,17 +105,20 @@ func registerEvents(p *proxy.Proxy, nc messaging.NatsService, logger logr.Logger
 
 	event.Subscribe(p.Event(), 0, func(e *proxy.PreLoginEvent) {
 		id, _ := e.ID()
-		if env.IsRestricted() {
-			if !util.CanJoinRestrictedServer(id, rc) {
-				e.Deny(mini.Parse("<color:red><bold>WHOOPS!</bold></color:red><color:gray> You are not allowed to join this server! Contact an administrator for a whitelist if you believe this is an error."))
-				return
-			}
-		}
+
 		banned, banMessage := util.IsBanned(id, rc)
 		if banned {
 			e.Deny(banMessage)
 			return
 		}
+
+		if env.IsRestricted() {
+			if !util.CanJoinRestrictedServer(id, rc) {
+				e.Deny(mini.Parse("<color:red><bold>WHOOPS!</bold></color:red><color:gray> You are not allowed to join this server!<newline> Contact an administrator for a whitelist if you believe this is an error."))
+				return
+			}
+		}
+
 		players.BroadcastPlayerJoin(nc, e.Username(), id, logger)
 		rc.SetHashPrefixed("online_players", id.String(), e.Username())
 	})
