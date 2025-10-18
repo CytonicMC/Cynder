@@ -50,6 +50,12 @@ func IsBanned(uuid uuid.UUID, redis redis.Service) (bool, *c.Text) {
 	if err != nil {
 		return false, nil
 	}
+
+	if data.Expiry.Before(time.Now()) {
+		redis.RemHashGlobal("banned_players", uuid.String())
+		return false, nil
+	}
+
 	return data.IsBanned, FormatBanMessage(data)
 }
 
@@ -63,25 +69,25 @@ func FormatBanMessage(b BanData) *c.Text {
 	var builder strings.Builder
 
 	if b.Expiry == nil {
-		builder.WriteString("<color:red>You are permanently banned from the Cytonic Network!</color>\n\n")
+		builder.WriteString("<color:red>You are permanently banned from the Cytonic Network!</color><newline><newline>")
 	} else {
-		builder.WriteString("<color:red>You are currently banned from the Cytonic Network!</color>\n\n")
+		builder.WriteString("<color:red>You are currently banned from the Cytonic Network!</color><newline><newline>")
 	}
 
 	reason := "No reason provided"
 	if b.Reason != nil {
 		reason = *b.Reason
 	}
-	builder.WriteString(fmt.Sprintf("<color:gray>Reason:</color> <color:white>%s</color>\n", reason))
+	builder.WriteString(fmt.Sprintf("<color:gray>Reason:</color> <color:white>%s</color><newline>", reason))
 
 	if b.Expiry != nil {
 		expiry := Unparse(b.Expiry, " ")
-		builder.WriteString(fmt.Sprintf("<color:gray>Expires:</color> <color:white>%s</color>\n\n", expiry))
+		builder.WriteString(fmt.Sprintf("<color:gray>Expires in: </color><color:aqua>%s</color><newline><newline>", expiry))
 	} else {
-		builder.WriteString("\n")
+		builder.WriteString("<newline>")
 	}
 
-	builder.WriteString("<color:gray>Appeal at:</color> <color:aqua><underlined>https://cytonic.net</underlined></color>\n")
+	builder.WriteString("<color:gray>Appeal at:</color> <color:aqua><underlined>https://cytonic.net/appeal</underlined></color><newline>")
 
 	return mini.Parse(builder.String())
 }
