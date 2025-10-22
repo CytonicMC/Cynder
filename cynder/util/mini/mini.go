@@ -9,16 +9,20 @@ package mini
 
 import (
 	"fmt"
-	"go.minekube.com/common/minecraft/color"
-	c "go.minekube.com/common/minecraft/component"
 	"math"
 	"strings"
+
+	"go.minekube.com/common/minecraft/color"
+	c "go.minekube.com/common/minecraft/component"
 )
 
 // Parse takes a string as input and returns a `c.Text` object. It splits the input string by "<",
 // then further splits each substring by ">". It modifies the style based on the key (the part before ">")
 // and appends a new text component with the modified style and content (the part after ">").
 func Parse(mini string) *c.Text {
+	// Replace literal \n with newline tags for consistent processing
+	mini = strings.ReplaceAll(mini, "\\n", "<newline>")
+
 	var styles []c.Style
 	styles = append(styles, c.Style{Color: color.White})
 
@@ -41,8 +45,9 @@ func Parse(mini string) *c.Text {
 		}
 
 		newText := modify(key, split[1], &styles[len(styles)-1])
-		components = append(components, newText)
-
+		if newText != nil {
+			components = append(components, newText)
+		}
 	}
 
 	return &c.Text{
@@ -56,6 +61,11 @@ func modify(key string, content string, style *c.Style) *c.Text {
 	newText := &c.Text{}
 
 	switch {
+	case key == "newline": // <newline>
+		// Create a text component with just a newline character
+		newText.Content = "\n" + content
+		newText.S = *style
+
 	case strings.HasPrefix(key, "#"): // <#ff00ff>
 		parsed, err := ParseColor(key)
 		if err != nil {
@@ -65,6 +75,7 @@ func modify(key string, content string, style *c.Style) *c.Text {
 		style.Color = parsed
 		newText.Content = content
 		newText.S = *style
+
 	case strings.HasPrefix(key, "color"): // <color:light_purple>
 		colorName := strings.Split(key, ":")[1]
 		parsed, err := ParseColor(colorName)
@@ -97,6 +108,11 @@ func modify(key string, content string, style *c.Style) *c.Text {
 		}
 
 		newText = Gradient(content, *style, colors...)
+
+	default:
+		// For unrecognized tags, just output the content with the current style
+		newText.Content = content
+		newText.S = *style
 	}
 
 	return newText

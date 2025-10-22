@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"os"
+
+	"github.com/CytonicMC/Cynder/cynder/env"
 	"github.com/CytonicMC/Cynder/cynder/messaging"
 	"github.com/CytonicMC/Cynder/cynder/natsMsgr/players"
 	"github.com/CytonicMC/Cynder/cynder/natsMsgr/servers"
@@ -14,10 +18,9 @@ import (
 	"github.com/nats-io/nats.go"
 	redis2 "github.com/redis/go-redis/v9"
 	"github.com/robinbraemer/event"
+	"go.minekube.com/common/minecraft/color"
 	"go.minekube.com/common/minecraft/component"
 	"go.minekube.com/gate/pkg/edition/java/proxy"
-	"log"
-	"os"
 )
 
 type Dependencies struct {
@@ -88,6 +91,7 @@ type Cynder struct {
 
 // when joining for the first time, the player is always sent to a lobby
 func registerEvents(p *proxy.Proxy, nc messaging.NatsService, logger logr.Logger, rc redis.Service) {
+
 	event.Subscribe(p.Event(), 0, func(e *proxy.PlayerChooseInitialServerEvent) {
 		server := servers.GetLeastLoadedServer("cytonic", "lobby")
 		//server := servers.GetLeastLoadedServer("gilded_gorge", "hub")
@@ -101,16 +105,30 @@ func registerEvents(p *proxy.Proxy, nc messaging.NatsService, logger logr.Logger
 
 	event.Subscribe(p.Event(), 0, func(e *proxy.PreLoginEvent) {
 		id, _ := e.ID()
+
+		banned, banMessage := util.IsBanned(id, rc)
+		if banned {
+			e.Deny(banMessage)
+			return
+		}
+
+		if env.IsRestricted() {
+			if !util.CanJoinRestrictedServer(id, rc) {
+				e.Deny(mini.Parse("<color:red><bold>WHOOPS!</bold></color:red><color:gray> You are not allowed to join this server!<newline> Contact an administrator for a whitelist if you believe this is an error."))
+				return
+			}
+		}
+
 		players.BroadcastPlayerJoin(nc, e.Username(), id, logger)
-		rc.SetHash("online_players", id.String(), e.Username())
+		rc.SetHashPrefixed("online_players", id.String(), e.Username())
 	})
 
 	event.Subscribe(p.Event(), 0, func(e *proxy.DisconnectEvent) {
 		id := e.Player().ID()
 		players.BroadcastPlayerLeave(nc, e.Player().Username(), id, logger)
-		rc.RemHash("online_players", id.String())
-		rc.RemHash("player_servers", id.String())
-
+		rc.RemHashPrefixed("online_players", id.String())
+		rc.RemHashPrefixed("player_servers", id.String())
+		rc.RemHashPrefixed("cytosis:nicknames", id.String())
 	})
 
 	event.Subscribe(p.Event(), 100, func(e *proxy.ServerPostConnectEvent) {
@@ -126,7 +144,7 @@ func registerEvents(p *proxy.Proxy, nc messaging.NatsService, logger logr.Logger
 			NewServer: e.Player().CurrentServer().Server().ServerInfo().Name(),
 		}
 
-		rc.SetHash("player_servers", e.Player().ID().String(), container.NewServer)
+		rc.SetHashPrefixed("player_servers", e.Player().ID().String(), container.NewServer)
 
 		data, err := json.Marshal(container)
 		if err != nil {
@@ -143,7 +161,7 @@ func registerEvents(p *proxy.Proxy, nc messaging.NatsService, logger logr.Logger
 
 	event.Subscribe(p.Event(), 100, func(e *proxy.KickedFromServerEvent) {
 
-		server, success := servers.GetFallbackFromServer(e.Server())
+		server, success := servers.GetFallbackFromServer(e.Server(), e.Server().ServerInfo().Name())
 
 		if !success {
 			msg := mini.Parse("<color:red><bold>WHOOPS!</bold></color:red><color:gray> Failed to rescue from internal disconnect. Initial kick reason: ")
@@ -160,9 +178,24 @@ func registerEvents(p *proxy.Proxy, nc messaging.NatsService, logger logr.Logger
 			logger.Info("Failed to rescue from internal disconnect. ")
 		} else {
 			logger.Info("Successfully rescued from internal disconnect. ")
+			reason := e.OriginalReason()
+			if reason != nil {
+				reason.Style().Color = color.Red
+			}
+			comp := &component.Text{
+				Content: "",
+				S:       component.Style{},
+				Extra: []component.Component{
+					mini.Parse("<color:gold><bold>YOINK!</bold></color:gold><color:gray> A kick occurred in your connection, so you were placed in a lobby!"),
+					mini.Parse("<color:red>("),
+					e.OriginalReason(),
+					mini.Parse("<color:red>)"),
+				},
+			}
+
 			e.SetResult(&proxy.RedirectPlayerKickResult{
 				Server:  server,
-				Message: mini.Parse("<color:gold><bold>YOINK!</bold></color:gold><color:gray> A kick occurred in your connection, so you were placed in a lobby!"),
+				Message: comp,
 			})
 		}
 	})
