@@ -7,6 +7,7 @@ import (
 
 	"github.com/CytonicMC/Cynder/cynder/natsMsgr/servers"
 	"github.com/CytonicMC/Cynder/cynder/util"
+	"github.com/CytonicMC/Cynder/cynder/util/mini"
 	"github.com/nats-io/nats.go"
 	"go.minekube.com/gate/pkg/edition/java/proxy"
 	"go.minekube.com/gate/pkg/util/componentutil"
@@ -45,10 +46,9 @@ func HandlePlayerKick(services *util.Services, proxyInstance *proxy.Proxy, ctx c
 				connect, err := player.CreateConnectionRequest(servers.GetLeastLoadedServer("cytosis", "lobby")).Connect(ctx)
 				if err != nil {
 					player.Disconnect(parsedComponent)
-					return
 				}
 				if connect.Status().ConnectionInProgress() {
-					//todo figure this shit show out
+					player.Disconnect(mini.Parse("<color:red><bold>WHOOPS!</bold></color:red><color:gray> Failed to rescue your connection! <color:red>ERR_ALREADY_CONNECTING"))
 				}
 				return
 			}
